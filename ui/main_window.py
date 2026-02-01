@@ -48,10 +48,17 @@ class MainWindow(QMainWindow):
 
         # Header
         header_layout = QHBoxLayout()
+        
+        # Dummy spacer to balance the right button (for perfect centering)
+        dummy_btn = QWidget()
+        dummy_btn.setFixedWidth(80) # Same width as the button
+        header_layout.addWidget(dummy_btn)
+        
         header_layout.addStretch() # Spacer Left
         
         title = QLabel(AppConstants.APP_NAME)
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #89b4fa;")
+        title.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(title)
         
         header_layout.addStretch() # Spacer Right
