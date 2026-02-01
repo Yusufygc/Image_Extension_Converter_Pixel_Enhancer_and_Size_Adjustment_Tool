@@ -6,21 +6,30 @@ class ThemeManager:
     @staticmethod
     def apply_theme(app: QApplication):
         """
-        Loads the main.qss file and applies it to the application.
+        Loads the main.qss file, replaces placeholders with actual paths,
+        and applies it to the application.
         """
         try:
-            # We assume main.qss is in ui/styles/ relative to this file? 
-            # Or better, use get_resource_path if we bundle it.
-            # But get_resource_path is relative to the *root* or where we run it.
-            # Let's try to find it relative to this file first.
-            
-            # Since this file is in ui/styles/theme.py, main.qss is in the same dir.
             current_dir = os.path.dirname(os.path.abspath(__file__))
             qss_path = os.path.join(current_dir, "main.qss")
             
             if os.path.exists(qss_path):
-                with open(qss_path, "r") as f:
+                with open(qss_path, "r", encoding='utf-8') as f:
                     qss = f.read()
+                    
+                    # Dynamically replace resource paths
+                    # For QSS, we need forward slashes even on Windows
+                    # ComboBox Arrow
+                    icon_down_path = get_resource_path("assets/icons/down-arrow.svg").replace("\\", "/")
+                    qss = qss.replace("@icon_down_arrow", icon_down_path)
+
+                    # SpinBox Arrows
+                    icon_spin_up = get_resource_path("assets/icons/up-arrow.svg").replace("\\", "/")
+                    icon_spin_down = get_resource_path("assets/icons/down-arrow.svg").replace("\\", "/")
+                    
+                    qss = qss.replace("@icon_spin_up", icon_spin_up)
+                    qss = qss.replace("@icon_spin_down", icon_spin_down)
+                    
                     app.setStyleSheet(qss)
             else:
                 print(f"Warning: Stylesheet not found at {qss_path}")

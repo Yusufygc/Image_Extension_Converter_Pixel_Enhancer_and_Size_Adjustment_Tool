@@ -1,11 +1,12 @@
 import os
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                                QPushButton, QLabel, QFileDialog, QComboBox, 
-                               QSpinBox, QDoubleSpinBox, QProgressBar, QMessageBox, QGroupBox, QListWidget)
+                               QSpinBox, QDoubleSpinBox, QProgressBar, QMessageBox, QGroupBox, QListWidget, QStackedWidget)
 from PySide6.QtCore import Qt, Slot, QSize
 
 from ui.widgets.drop_zone import DropZone
 from ui.styles.theme import ThemeManager
+from ui.views.info_view import InfoView
 from ui.worker import ProcessingWorker
 from core.converter import ConverterService
 from core.resizer import ResizerService
@@ -19,6 +20,13 @@ class MainWindow(QMainWindow):
         self.app_instance = app
         self.setWindowTitle(AppConstants.APP_NAME)
         self.setMinimumSize(AppConstants.WINDOW_WIDTH, AppConstants.WINDOW_HEIGHT)
+        
+        # Set Application Icon
+        from PySide6.QtGui import QIcon
+        icon_path = get_resource_path("assets/icons/icon.ico")
+        if os.path.exists(icon_path):
+            self.app_instance.setWindowIcon(QIcon(icon_path))
+            self.setWindowIcon(QIcon(icon_path))
         
         # Services
         self.converter_service = ConverterService()
@@ -40,21 +48,54 @@ class MainWindow(QMainWindow):
 
         # Header
         header_layout = QHBoxLayout()
+        header_layout.addStretch() # Spacer Left
+        
         title = QLabel(AppConstants.APP_NAME)
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #89b4fa;")
         header_layout.addWidget(title)
-        header_layout.addStretch()
+        
+        header_layout.addStretch() # Spacer Right
+        
+        # Info Button
+        self.btn_info = QPushButton("Bilgi")
+        self.btn_info.setFixedWidth(80)
+        self.btn_info.clicked.connect(self.toggle_info_page)
+        header_layout.addWidget(self.btn_info)
+        
         main_layout.addLayout(header_layout)
+
+        # Stacked Widget for Pages
+        self.stack = QStackedWidget()
+        main_layout.addWidget(self.stack)
+
+        # Page 1: Home (Original Content)
+        self.page_home = QWidget()
+        self.setup_home_page(self.page_home)
+        self.stack.addWidget(self.page_home)
+
+        # Page 2: Info
+        self.page_info = InfoView()
+        self.stack.addWidget(self.page_info)
+        
+        # Progress Bar (Should be visible on Home page only? Or global? 
+        # Typically global but structurally it was at bottom. Let's keep it global if relevant, 
+        # but logically it belongs to the 'processing' task on Home page. 
+        # Making it part of Home page layout is safer visually.)
+        
+    def setup_home_page(self, parent_widget):
+        layout = QVBoxLayout(parent_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(20)
 
         # 1. Drop Zone & File List
         content_layout = QHBoxLayout()
         
         # Left Side: Inputs
-        left_panel = QVBoxLayout()
+        left_side_group = QGroupBox("1. Resim Seçimi")
+        left_side_layout = QVBoxLayout()
+        
         self.drop_zone = DropZone()
         self.drop_zone.files_dropped.connect(self.add_files)
-        # Mouse click hack: make specific button or override mousePress in widget
-        # For now, let's add a button below dropzone for explicit browse
         
         self.btn_browse = QPushButton("Dosya Seç")
         self.btn_browse.clicked.connect(self.browse_files)
@@ -62,21 +103,22 @@ class MainWindow(QMainWindow):
         self.file_list = QListWidget()
         self.file_list.setMaximumHeight(150)
         self.file_list.setAlternatingRowColors(True)
+        
+        self.btn_clear = QPushButton("Seçilen dosyaları temizle")
+        self.btn_clear.setObjectName("DangerButton")
+        self.btn_clear.setMinimumHeight(45)
+        self.btn_clear.clicked.connect(self.clear_files)
 
-        left_side_group = QGroupBox("1. Resim Seçimi")
-        left_side_layout = QVBoxLayout()
         left_side_layout.addWidget(self.drop_zone)
         left_side_layout.addWidget(self.btn_browse)
         left_side_layout.addWidget(QLabel("Seçilen Dosyalar:"))
         left_side_layout.addWidget(self.file_list)
+        left_side_layout.addWidget(self.btn_clear)
         left_side_group.setLayout(left_side_layout)
         
         content_layout.addWidget(left_side_group, stretch=1)
 
         # Right Side: Operations
-        right_panel = QVBoxLayout()
-        
-        # Operation Type Selection
         op_group = QGroupBox("2. İşlem Seçimi")
         op_layout = QVBoxLayout()
         
@@ -120,9 +162,9 @@ class MainWindow(QMainWindow):
         self.spin_height = QSpinBox()
         self.spin_height.setRange(1, 10000)
         self.spin_height.setValue(1080)
-        ird_layout.addWidget(QLabel("Gen:"))
+        ird_layout.addWidget(QLabel("Genişlik:"))
         ird_layout.addWidget(self.spin_width)
-        ird_layout.addWidget(QLabel("Yük:"))
+        ird_layout.addWidget(QLabel("Yükseklik:"))
         ird_layout.addWidget(self.spin_height)
         
         self.input_resize_percent = QWidget()
@@ -147,47 +189,47 @@ class MainWindow(QMainWindow):
         self.spin_factor.setSingleStep(0.5)
         self.spin_factor.setValue(2.0)
         we_layout.addWidget(self.spin_factor)
-
-        # Add all to options layout
+        
         self.options_layout.addWidget(self.widget_convert)
         self.options_layout.addWidget(self.widget_resize)
         self.options_layout.addWidget(self.widget_enhance)
         
         op_layout.addWidget(self.options_container)
-        op_group.setLayout(op_layout)
         
-        content_layout.addWidget(op_group, stretch=1)
-        main_layout.addLayout(content_layout)
-
-        # Action Area
-        action_layout = QHBoxLayout()
         self.btn_process = QPushButton("İŞLEMİ BAŞLAT")
         self.btn_process.setObjectName("PrimaryButton")
         self.btn_process.setMinimumHeight(50)
         self.btn_process.clicked.connect(self.start_processing)
+        op_layout.addWidget(self.btn_process)
         
-        self.btn_clear = QPushButton("Temizle")
-        self.btn_clear.setObjectName("DangerButton")
-        self.btn_clear.clicked.connect(self.clear_files)
+        op_group.setLayout(op_layout)
         
-        action_layout.addWidget(self.btn_clear)
-        action_layout.addWidget(self.btn_process, stretch=2)
-        main_layout.addLayout(action_layout)
+        content_layout.addWidget(op_group, stretch=1)
+        layout.addLayout(content_layout)
         
         # Progress
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.status_label = QLabel("Hazır")
-        main_layout.addWidget(self.status_label)
-        main_layout.addWidget(self.progress_bar)
+        layout.addWidget(self.status_label)
+        layout.addWidget(self.progress_bar)
 
     def set_app_instance(self, app):
         self.app_instance = app
         ThemeManager.apply_theme(app)
 
     @Slot()
+    def toggle_info_page(self):
+        if self.stack.currentIndex() == 0:
+            self.stack.setCurrentIndex(1)
+            self.btn_info.setText("Geri")
+        else:
+            self.stack.setCurrentIndex(0)
+            self.btn_info.setText("Bilgi")
+
+    @Slot()
     def browse_files(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Resim Seç", "", "Resim Dosyaları (*.png *.jpg *.jpeg *.bmp *.webp *.ico *.tiff)")
+        files, _ = QFileDialog.getOpenFileNames(self, "Resim Seç", "", "Resim Dosyaları (*.png *.jpg *.jpeg *.bmp *.webp *.ico *.tiff *.svg)")
         if files:
             self.add_files(files)
 
