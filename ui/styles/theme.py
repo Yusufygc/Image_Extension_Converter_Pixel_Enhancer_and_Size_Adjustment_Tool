@@ -10,8 +10,8 @@ class ThemeManager:
         and applies it to the application.
         """
         try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            qss_path = os.path.join(current_dir, "main.qss")
+            # Load QSS from assets/style folder
+            qss_path = get_resource_path("assets/style/main.qss")
             
             if os.path.exists(qss_path):
                 with open(qss_path, "r", encoding='utf-8') as f:

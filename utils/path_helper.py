@@ -13,18 +13,13 @@ def get_resource_path(relative_path):
     """
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
-        # Nuitka might handle it differently, but usually __file__ relative is safe for dev,
-        # and checking sys attributes is good for frozen apps.
-        if getattr(sys, 'frozen', False):
-             # If the application is run as a bundle, the PyInstaller bootloader
-            # extends the sys module by a flag frozen=True and sets the app 
-            # path into variable _MEIPASS'.
-            if hasattr(sys, '_MEIPASS'):
-                base_path = sys._MEIPASS
-            else:
-                 # Nuitka might just be the executable directory
-                base_path = os.path.dirname(sys.executable)
+        if hasattr(sys, '_MEIPASS'):
+            base_path = sys._MEIPASS
         else:
+            # Works for development and Nuitka (Standalone & Onefile)
+            # In Nuitka Onefile, __file__ points to the temporary extracted directory,
+            # whereas sys.executable points to the original exe file.
+            # Since our assets are bundled inside the temp dir, we must use __file__.
             base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
         return os.path.join(base_path, relative_path)
